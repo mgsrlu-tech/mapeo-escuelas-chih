@@ -75,6 +75,12 @@
  .loginbox{background:#fff;border-radius:14px;padding:30px 34px;max-width:380px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
  .loginbox h2{color:#1F4E79;margin:0 0 6px;font-size:20px}
  .loginbox p{color:#555;font-size:13px;margin:0 0 18px}
+ .loginbox input{width:100%;box-sizing:border-box;padding:10px;margin:0 0 10px;border:1px solid #ccc;
+  border-radius:8px;font-size:14px}
+ #lbtn{width:100%;background:#1F6FE0;color:#fff;border:none;border-radius:8px;padding:11px;font-size:15px;
+  font-weight:700;cursor:pointer}#lbtn:hover{background:#1860c4}
+ .loginlinks{margin-top:12px;font-size:12px;line-height:1.9}
+ .loginlinks a{color:#1F6FE0;cursor:pointer;text-decoration:none}.loginlinks a:hover{text-decoration:underline}
  #gbtn{background:#fff;color:#444;border:1px solid #ccc;border-radius:8px;padding:11px 18px;font-size:14px;
   font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
  #gbtn:hover{background:#f7f7f7}
@@ -87,7 +93,13 @@
 <div id="login"><div class="loginbox">
  <h2>Mapeo de Escuelas · Chihuahua</h2>
  <p>Programa de Intervención Escolar.<br>Acceso solo para el equipo autorizado.</p>
- <button id="gbtn">Entrar con Google</button>
+ <input type="email" id="lemail" placeholder="Tu correo" autocomplete="username">
+ <input type="password" id="lpass" placeholder="Contraseña" autocomplete="current-password">
+ <button id="lbtn">Entrar</button>
+ <div class="loginlinks">
+   <a id="lcreate">Primera vez: crear mi contraseña</a><br>
+   <a id="lforgot">Olvidé mi contraseña</a>
+ </div>
  <div id="loginmsg"></div>
 </div></div>
 <button id="logout">Salir</button>
@@ -461,17 +473,33 @@ function subscribe(){
 const _loginEl=document.getElementById('login'), _msgEl=document.getElementById('loginmsg'), _logoutEl=document.getElementById('logout');
 function showLogin(msg){ _loginEl.style.display='flex'; _logoutEl.style.display='none'; _msgEl.textContent=msg||''; }
 function hideLogin(){ _loginEl.style.display='none'; _logoutEl.style.display='block'; }
-document.getElementById('gbtn').onclick=()=>{ _msgEl.textContent='Abriendo Google... (permite la ventana emergente)';
- const p=new firebase.auth.GoogleAuthProvider();
- _auth.signInWithPopup(p)
-  .then(()=>{ _msgEl.textContent=''; })
-  .catch(e=>{
-   if(e.code==='auth/popup-blocked'){ _msgEl.textContent='El navegador bloqueó la ventana. Redirigiendo...'; _auth.signInWithRedirect(p); }
-   else if(e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'){ _msgEl.textContent=''; }
-   else { _msgEl.textContent='No se pudo iniciar sesión: '+e.message; }
-  });
+const _email=()=>(document.getElementById('lemail').value||'').trim().toLowerCase();
+const _pass=()=>document.getElementById('lpass').value||'';
+function authErr(e){
+ const m={'auth/invalid-email':'Correo inválido.','auth/missing-password':'Escribe tu contraseña.',
+  'auth/wrong-password':'Contraseña incorrecta.','auth/invalid-credential':'Correo o contraseña incorrectos.',
+  'auth/user-not-found':'No existe esa cuenta. Si es tu primera vez, usa "crear mi contraseña".',
+  'auth/email-already-in-use':'Ya tienes cuenta con ese correo. Usa "Entrar".',
+  'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+  'auth/too-many-requests':'Demasiados intentos. Espera un momento.'};
+ return m[e.code]||e.message;
+}
+document.getElementById('lbtn').onclick=()=>{
+ if(!_email()||!_pass()){ _msgEl.textContent='Escribe tu correo y contraseña.'; return; }
+ _msgEl.textContent='Entrando...';
+ _auth.signInWithEmailAndPassword(_email(),_pass()).catch(e=>{ _msgEl.textContent=authErr(e); });
 };
-_auth.getRedirectResult().catch(e=>{ _msgEl.textContent='Error al volver de Google: '+e.message; });
+document.getElementById('lpass').addEventListener('keydown',e=>{ if(e.key==='Enter')document.getElementById('lbtn').click(); });
+document.getElementById('lcreate').onclick=()=>{
+ if(!ALLOWED.includes(_email())){ _msgEl.textContent='Ese correo no está en la lista del equipo. Pide que te agreguen.'; return; }
+ if(_pass().length<6){ _msgEl.textContent='Para crear tu acceso: escribe una contraseña de 6+ caracteres y vuelve a picar aquí.'; return; }
+ _msgEl.textContent='Creando tu acceso...';
+ _auth.createUserWithEmailAndPassword(_email(),_pass()).catch(e=>{ _msgEl.textContent=authErr(e); });
+};
+document.getElementById('lforgot').onclick=()=>{
+ if(!_email()){ _msgEl.textContent='Escribe tu correo y vuelve a picar aquí.'; return; }
+ _auth.sendPasswordResetEmail(_email()).then(()=>{ _msgEl.style.color='#179B57'; _msgEl.textContent='Te enviamos un correo para restablecer tu contraseña.'; }).catch(e=>{ _msgEl.textContent=authErr(e); });
+};
 _logoutEl.onclick=()=>_auth.signOut();
 _auth.onAuthStateChanged(u=>{
  if(u && ALLOWED.includes((u.email||'').toLowerCase())){ hideLogin(); subscribe(); }
