@@ -1,5 +1,6 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Mapa de Escuelas por Sector — Ciudad de Chihuahua</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
@@ -460,9 +461,15 @@ function subscribe(){
 const _loginEl=document.getElementById('login'), _msgEl=document.getElementById('loginmsg'), _logoutEl=document.getElementById('logout');
 function showLogin(msg){ _loginEl.style.display='flex'; _logoutEl.style.display='none'; _msgEl.textContent=msg||''; }
 function hideLogin(){ _loginEl.style.display='none'; _logoutEl.style.display='block'; }
-document.getElementById('gbtn').onclick=()=>{ _msgEl.textContent='Redirigiendo a Google...';
+document.getElementById('gbtn').onclick=()=>{ _msgEl.textContent='Abriendo Google... (permite la ventana emergente)';
  const p=new firebase.auth.GoogleAuthProvider();
- _auth.signInWithRedirect(p).catch(e=>{ _msgEl.textContent='No se pudo iniciar sesión: '+e.message; });
+ _auth.signInWithPopup(p)
+  .then(()=>{ _msgEl.textContent=''; })
+  .catch(e=>{
+   if(e.code==='auth/popup-blocked'){ _msgEl.textContent='El navegador bloqueó la ventana. Redirigiendo...'; _auth.signInWithRedirect(p); }
+   else if(e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'){ _msgEl.textContent=''; }
+   else { _msgEl.textContent='No se pudo iniciar sesión: '+e.message; }
+  });
 };
 _auth.getRedirectResult().catch(e=>{ _msgEl.textContent='Error al volver de Google: '+e.message; });
 _logoutEl.onclick=()=>_auth.signOut();
