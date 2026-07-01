@@ -268,9 +268,11 @@ function build(){
   if(callOf(f)){ stl.color='#6f42c1'; stl.weight=3.5; stl.dashArray='4'; }
   let m;
   if(f.added){
+   const afill=(stOf(f)==='Sin contactar')?COL[f.sector]:STCOL[stOf(f)];
+   const abord=callOf(f)?'#6f42c1':'#fff';
    m=L.marker([f.lat,f.lon],{draggable:true,icon:L.divIcon({className:'',
-     html:`<div style="width:16px;height:16px;border-radius:50%;background:${COL[f.sector]};border:2px solid #fff;box-shadow:0 0 3px #0007"></div>`,
-     iconSize:[16,16],iconAnchor:[8,8]})});
+     html:`<div style="width:17px;height:17px;border-radius:50%;background:${afill};border:2px solid ${abord};box-shadow:0 0 3px #0007"></div>`,
+     iconSize:[17,17],iconAnchor:[8,8]})});
    m.on('dragend',()=>{ const ll=m.getLatLng(); f.lat=ll.lat; f.lon=ll.lng;
      const a=ADDED.find(x=>x.id===f.id); if(a){a.lat=ll.lat; a.lon=ll.lng; saveAdded();} });
    addedLayer.addLayer(m);
