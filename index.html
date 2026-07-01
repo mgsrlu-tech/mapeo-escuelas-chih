@@ -233,7 +233,19 @@ function popupHTML(f){
   <button class="pbtn" data-act="note" style="background:#E8A200;margin-left:5px">📝 ${nota?'Editar nota':'Añadir nota'}</button>
   </div>`;
 }
-const cluster=L.markerClusterGroup({maxClusterRadius:40});
+const cluster=L.markerClusterGroup({maxClusterRadius:40,
+ iconCreateFunction:function(c){
+  const ms=c.getAllChildMarkers(), n=ms.length;
+  const cnt={}; STATUS.forEach(function(p){cnt[p[0]]=0;});
+  ms.forEach(function(m){ cnt[m._f?stOf(m._f):'Sin contactar']++; });
+  let acc=0, stops=[];
+  STATUS.forEach(function(p){ if(cnt[p[0]]>0){ const from=(acc/n*100).toFixed(2), to=((acc+cnt[p[0]])/n*100).toFixed(2); stops.push(p[1]+' '+from+'% '+to+'%'); acc+=cnt[p[0]]; } });
+  const grad=stops.length>1?('conic-gradient('+stops.join(',')+')'):(STATUS.find(function(p){return cnt[p[0]]>0;})||['','#9aa0a6'])[1];
+  const size=n<10?38:(n<50?44:52), inner=size-14;
+  const html='<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+grad+';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 5px rgba(0,0,0,.4)">'
+   +'<div style="width:'+inner+'px;height:'+inner+'px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#333">'+n+'</div></div>';
+  return L.divIcon({html:html,className:'',iconSize:[size,size]});
+ }});
 let addedLayer=L.layerGroup().addTo(map);
 let markersById={};
 function passFilter(f){
