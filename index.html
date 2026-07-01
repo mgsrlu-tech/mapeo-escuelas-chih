@@ -8,7 +8,8 @@
 <style>
  body{margin:0;font-family:system-ui,Arial,sans-serif}#map{height:100vh}
  .panel{position:absolute;top:10px;right:10px;z-index:1000;background:#fff;padding:12px 14px;
-  border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.28);max-width:230px;font-size:13px}
+  border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.28);max-width:235px;font-size:13px;
+  max-height:92vh;overflow:auto}
  .panel h1{font-size:15px;margin:0 0 8px;color:#222}
  .row{margin:4px 0}.row b{display:inline-block;width:13px;height:13px;border-radius:50%;
   margin-right:7px;vertical-align:-2px;box-shadow:0 0 0 1px #0002}
@@ -27,6 +28,13 @@
  .stbtns button.sel{outline:2px solid #222;outline-offset:1px}
  .stcount{margin-top:8px;border-top:1px solid #eee;padding-top:8px;font-size:11px}
  .stcount .row b{box-shadow:none}
+ .cnthd{display:flex;align-items:center;cursor:pointer;padding:3px 2px;border-radius:5px}
+ .cnthd:hover{background:#f3f3f3}
+ .cnthd b.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;flex:none}
+ .cnthd .chev{margin-left:auto;color:#999;font-size:10px}
+ .cntlist{margin:2px 0 4px 17px;border-left:2px solid #eee;padding-left:7px}
+ .cntitem{padding:3px 2px;cursor:pointer;color:#333;line-height:1.25;border-bottom:1px solid #f4f4f4}
+ .cntitem:hover{color:#1F6FE0}
  .actbtn{margin-top:7px;width:100%;padding:6px;border:1px solid #1F6FE0;background:#1F6FE0;
   color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
  .curst{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11px;color:#fff;font-weight:600}
@@ -198,13 +206,13 @@ function setNote(f,txt){ if(txt){NOTES[f.id]=txt; cloudSet({['notes.'+f.id]:txt}
 function setCall(f,dt){ if(dt){CALLS[f.id]=dt; cloudSet({['calls.'+f.id]:dt});} else {delete CALLS[f.id]; cloudSet({['calls.'+f.id]:FDEL});} build(); renderList(); }
 function saveAdded(){ const m={}; ADDED.forEach(a=>{ m['addedMap.'+a.id]={id:a.id,nombre:a.nombre,nivel:a.nivel,sector:a.sector,turno:a.turno||'',cct:a.cct||'',tel:a.tel||'',dom:a.dom||'',lat:a.lat,lon:a.lon,fuente:a.fuente||'Agregada manualmente',added:true}; }); if(Object.keys(m).length)cloudSet(m); }
 function mStyle(f){
- const st=stOf(f), base=COL[f.sector];
- if(st==='Atendida')        return {radius:6,color:'#179B57',weight:3,fillColor:base,fillOpacity:.25};
- if(st==='No interesada')   return {radius:5,color:'#B0413E',weight:2,fillColor:'#cfcfcf',fillOpacity:.35,dashArray:'2'};
- if(st==='Agendada')        return {radius:8,color:'#1F6FE0',weight:3.5,fillColor:base,fillOpacity:.95};
- if(st==='Contactada')      return {radius:7,color:'#E8B500',weight:3.5,fillColor:base,fillOpacity:.95};
- if(st==='Volver a intentar')return {radius:7,color:'#E8702A',weight:3.5,fillColor:base,fillOpacity:.95};
- return {radius:7,color:'#fff',weight:1.4,fillColor:base,fillOpacity:.95};
+ const st=stOf(f);
+ // relleno = color del sector si no se ha contactado; color del ESTATUS en cuanto se marca
+ const fill=(st==='Sin contactar')?COL[f.sector]:STCOL[st];
+ const s={radius:7,color:'#fff',weight:1.7,fillColor:fill,fillOpacity:.95};
+ if(st==='Atendida'){ s.radius=6; s.color='#0f7a43'; s.weight=2.4; }
+ if(st==='No interesada'){ s.radius=6; s.fillOpacity=.6; s.dashArray='2'; }
+ return s;
 }
 function popupHTML(f){
  const st=stOf(f), nota=noteOf(f), call=callOf(f);
@@ -278,13 +286,30 @@ map.on('popupopen',function(e){
  const cb=el.querySelector('[data-act=call]'); if(cb)cb.onclick=()=>{ map.closePopup(); openCallModal(f); };
  const nb=el.querySelector('[data-act=note]'); if(nb)nb.onclick=()=>{ map.closePopup(); openNoteModal(f); };
 });
+let _openCnt={};
 function updateCounts(){
- const c={}; STATUS.forEach(([s])=>c[s]=0);
- DATA.forEach(f=>c[stOf(f)]++);
- document.getElementById('counts').innerHTML=STATUS.filter(([s])=>s!=='Sin contactar')
-  .map(([s,col])=>`<div class="row"><b style="display:inline-block;width:11px;height:11px;
-   border-radius:50%;margin-right:6px;background:${col};vertical-align:-1px"></b>${s}: <b>${c[s]}</b></div>`).join('')
-  + `<div class="row" style="color:#888">Sin contactar: ${c['Sin contactar']}</div>`;
+ const groups={}; STATUS.forEach(([s])=>groups[s]=[]);
+ DATA.forEach(f=>groups[stOf(f)].push(f));
+ let html='';
+ STATUS.forEach(([s,col])=>{
+  if(s==='Sin contactar')return;
+  const items=groups[s].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const open=_openCnt[s]&&items.length;
+  html+=`<div class="cntgrp"><div class="cnthd" data-st="${s}">
+    <b class="dot" style="background:${col}"></b>${s}: <b>${items.length}</b>
+    ${items.length?`<span class="chev">${open?'▾':'▸'}</span>`:''}</div>
+    <div class="cntlist" data-list="${s}" style="display:${open?'block':'none'}">
+    ${items.map(f=>`<div class="cntitem" data-focus="${f.id}">${f.nombre}<br><small style="color:#999">${f.sector} · ${f.nivel}</small></div>`).join('')}</div></div>`;
+ });
+ html+=`<div class="cntgrp" style="color:#888;padding:3px 2px">Sin contactar: <b>${groups['Sin contactar'].length}</b></div>`;
+ const el=document.getElementById('counts'); el.innerHTML=html;
+ el.querySelectorAll('.cnthd').forEach(h=>h.onclick=()=>{
+  const s=h.getAttribute('data-st'); _openCnt[s]=!_openCnt[s];
+  const l=el.querySelector('[data-list="'+s+'"]'); if(!l)return;
+  l.style.display=_openCnt[s]?'block':'none';
+  const c=h.querySelector('.chev'); if(c)c.textContent=_openCnt[s]?'▾':'▸';
+ });
+ el.querySelectorAll('.cntitem').forEach(e=>e.onclick=()=>focusSchool(e.getAttribute('data-focus')));
 }
 document.getElementById('export').onclick=function(){
  let rows=[['id','Nombre','Sector','Nivel','CCT','Telefono','Estatus','Nota','FechaLlamada','Lat','Lon','Agregada']];
